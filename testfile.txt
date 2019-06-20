@@ -1,0 +1,19 @@
+import urllib2
+import json
+
+
+file = open('mlb_insights_practice - pinterest_insights_mlb.tsv', 'r')
+
+data = file.readlines()
+final_data = data[1:]
+diversity = 0
+
+for line in final_data:
+    lists = line.split('\t')
+    query = lists[1]
+#    print('http://34.74.185.156:12001/pinterest/insights/similar?tags='+query.replace(' ', '+')+'&d='+str(diversity)
+    insights = json.loads(urllib2.urlopen('http://34.74.185.156:12001/pinterest/insights/similar?tags='+query.replace(' ', '+')+'&d='+str(diversity)).read())['data']['insights']
+    print(insights)
+ #   print query
+
+file.close()
