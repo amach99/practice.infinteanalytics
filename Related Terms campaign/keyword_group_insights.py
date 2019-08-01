@@ -1,5 +1,7 @@
 import requests
-import json
+#import json
+#import pandas as pd
+import time
 
 food = ['Whey',
         'Cookie',
@@ -77,7 +79,7 @@ entertainers = ['Katie Holmes',
                 'Morena Baccarin'
                 ]
 
-movies = ['Inception'
+movies = ['Inception',
           'Doctor Strange',
           'The Matrix',
           'Hulk (comics)',
@@ -146,82 +148,208 @@ fiction = [movies, videoGames, fictional_char]
 # 'http://34.74.185.156:12001/pinterest/insights/containing?query='+query+'&k=50'
 # similar api
 # http://34.74.185.156:12001/pinterest/insights/similar?tags='example'&d=[-100,0,100]
-#
-
 
 # need to match keyword to a node first using containing api, then search for similar terms using the similar api
-data = sports
-print(len(data))
 
 
+def get_potential_tags(keyword):
+    if ' ' in keyword:
+        query = keyword.replace(' ', '+')
+    else:
+        query = keyword
 
-def get_tags(data):
-    index = 0
-    # containing insights
-    while index < len(data):
-        if ' ' in data[index]:
-            query = data[index].replace(' ', '+')
-        else:
-            query = data[index]
+    print('QUERY: ', query)
 
-        print('INDEX #', index)
-        print('QUERY: ', query)
+    # get insights
+    pin_url = 'http://34.74.185.156:12001/pinterest/insights/containing?query=' + query + '&k=500'
+    potential_pin_tags = requests.get(pin_url).json()
+    print('POTENTIAL TAGS: ', potential_pin_tags, '\n')
 
-        # get insights
-        pin_url = 'http://34.74.185.156:12001/pinterest/insights/containing?query='+query+'&k=500'
-        insights = requests.get(pin_url).json()
-        print('INSIGHTS: ', insights, '\n')
+    return potential_pin_tags
 
-        index += 1
-    return insights
 
-def match_keyTo_tag(insights):
+def match_keyword_toTag(keyword, potential_pin_tags):
     # get most identical tag
-    tag_list = list(insights['data']['insights'])
+    tags_containing_keyword = []
+    tag_list = list(potential_pin_tags['data']['insights'])
+    print('TAG LIST: ', tag_list, 'TAG_LIST_LEN: ', len(tag_list), '\n')
     insight_index = 0
-    print(len(tag_list),'\n')
     while insight_index < len(tag_list):
-        if '+' in query:
-            query = query.replace('+', ' ')
-            print('QUERY:', query)
-            print('INDEX:', tag_list[insight_index])
-        if query in tag_list[insight_index]:
-            keyword = query
-            print('KEYWORD: ', keyword)
+        tag = tag_list[insight_index]
+        print('TAG IS: ', tag)
 
+    # checking if the words are the same by comparing strings
+        if keyword.lower() == tag.lower():
+            perfect_tag = tag
+            print('MATCH FOUND: ', perfect_tag, '\n')
+            return perfect_tag
+        else:
+            tags_containing_keyword.append(tag)
 
         insight_index += 1
 
-    return tags
+    print('NO EXACT MATCH FOUND\n')
+    return tags_containing_keyword[:20]
 
-# todo finish match key to tag fucntion
 
-
-def get_similar_terms():
+def get_similar_terms(matched_tag):
     index = 0
     diversity = -100
+    insights = []
+
     # similar insights
-    while index < len(data) and diversity < 101:
-        if ' ' in data[index]:
-            keyword = data[index].replace(' ', '+')
-        else:
-            keyword = data[index]
-
-        print('INDEX #', index)
-        print('KEYWORD: ', keyword)
-
-        # get insights
-        pin_url = 'http://34.74.185.156:12001/pinterest/insights/similar?tags=' + keyword + '&d=' + str(diversity)
-        insights = requests.get(pin_url).json()
-        print('INSIGHTS: ', insights, '\n')
-
-        index += 1
-        if index == len(data):  # went thru all the indices, need to change diversity and rerun the loop
-            index = 0
-            diversity += 100
+    if type(matched_tag) is str:
+        while diversity <= 100:
             print('###################################')
             print('DIVERSITY = ', diversity)
 
-        # update values
+            if ' ' in matched_tag:
+                keyword = matched_tag.replace(' ', '+')
+            else:
+                keyword = matched_tag
+            print('KEYWORD: ', keyword)
 
+            # get insights
+            pin_url = 'http://34.74.185.156:12001/pinterest/insights/similar?tags=' + keyword + '&d=' + str(diversity)
+            response = requests.get(pin_url).json()
+            sim_num = response['data']['insights'][index][-1]
+            print('INSIGHTS: ', response)
+            print('SIM: ', sim_num)
+            print('\n')
+
+            if diversity == -100:
+                dNeg_100_insights = response['data']['insights']
+                insights.append('D = -100:')
+                insights.append(dNeg_100_insights)
+            if diversity == 0:
+                d_0_insights = response['data']['insights']
+                insights.append('D = 0:')
+                insights.append(d_0_insights)
+            if diversity == 100:
+                d_100_insights = response['data']['insights']
+                # insights.append('D = 100:')
+                # insights.append(d_100_insights)
+                break
+            diversity += 100
+           # print('###################################')
+            #print('DIVERSITY = ', diversity)
+    else:
+        while index < len(matched_tag):
+            while diversity <= 100:
+                print('###################################')
+                print('DIVERSITY = ', diversity)
+
+                if ' ' in matched_tag[index]:
+                    keyword = matched_tag[index].replace(' ', '+')
+                else:
+                    keyword = matched_tag[index]
+                print('INDEX #', index)
+                print('KEYWORD: ', keyword)
+
+                # get insights
+                pin_url = 'http://34.74.185.156:12001/pinterest/insights/similar?tags='+keyword+'&d=' + str(diversity)
+                response = requests.get(pin_url).json()
+                sim_num = keyword['insights'][index][-1]
+                print('INSIGHTS: ', response)
+                print('SIM: ', sim_num)
+                print('\n')
+
+
+                if diversity == -100:
+                    dNeg_100_insights = response['data']['insights']
+                    insights.append('D = -100:')
+                    insights.append(dNeg_100_insights)
+                if diversity == 0:
+                    d_0_insights = response['data']['insights']
+                    insights.append('D = 0:')
+                    insights.append(d_0_insights)
+                if diversity == 100:
+                    d_100_insights = response['data']['insights']
+                    # insights.append('D = 100:')
+                    # insights.append(d_100_insights)
+                    diversity = -100
+                    break
+
+                diversity += 100
+                #print('###################################')
+               # print('DIVERSITY = ', diversity)
+
+            index += 1
+
+    # update values
+    #sorted_insights = response.sorted()
+    #print(sorted_insights)
     return insights
+# todo work on merging total insights list, d=0 and d = -100
+
+def getRT_from_pint(data):
+    counter = 0
+    data_len = len(data)
+    perfect_tags = []
+
+    while counter < data_len:
+
+        ppTags = get_potential_tags(data[counter])
+        if len(ppTags['data']['insights']) == 0:
+            print('NO POTENTIAL TAGS FOUND!\n')
+            counter += 1
+            continue
+       # print('##########POTENTIAL TAGS##########')
+        #print(ppTags, '\n')
+
+        matched_tags = match_keyword_toTag(data[counter], ppTags)
+        print('##########TAGS###########')
+        print(matched_tags, '\n')
+        if type(matched_tags) is str:
+            perfect_tags.append(matched_tags)
+
+        insights = get_similar_terms(matched_tags)
+        print('DATA:', data[counter])
+        print('TOTAL INSIGHTS:', insights, '\n')
+
+        #time.sleep(3)
+        counter += 1
+
+    print('PERFECT TAGS', perfect_tags)
+    #perfect_tags_list.append(perfect_tags)
+    return insights
+
+
+# main
+
+data = sports
+insights = getRT_from_pint(data)
+
+
+
+'''
+# loop to run thru all perfect tags
+counter = 0
+perfect_tags_list = [['The matrix', 'Star trek', 'The hunger games', 'Logan', 'Iron man', 'Deadpool', 'Marvel entertainment', 'Ghost rider', 'Fantastic four', 'Iron man 3', 'The karate kid', 'Ghostbusters'], ['Devil may cry', 'Minecraft'], ['Luke skywalker', 'Iron man', 'Hulk', 'Spiderman'], ['Sachin tendulkar', 'Virat kohli', 'Cristiano ronaldo', 'Fifa world cup', 'Cricket world cup'], ['Katie holmes', 'Logan paul', 'Jennifer lawrence', 'Jason momoa', 'Morena baccarin'], ['Potato chip', 'Fried chicken', 'Pepsi', 'Mountain dew', 'Biscuits', 'Pineapple', 'Bottled water', 'Kale', 'Coffeemaker', 'Watermelon', 'Ketchup', 'Cream soda', 'Pomegranate', 'Lemon', 'Coca cola zero', 'Doritos', 'Diet coke']]
+keyword_clusters = [fiction, nonFiction]
+while counter < len(perfect_tags_list):
+    data = perfect_tags_list[counter]
+    insights = getRT_from_pint(data)
+    counter += 1
+'''
+'''
+# big loop to run thru all the clusters
+perfect_tags_list = []
+keyword_clusters = [fiction, nonFiction]
+fiction_len = len(fiction)
+nonFiction_len = len(nonFiction)
+
+cluster_counter = 0
+while cluster_counter < len(keyword_clusters):
+    data_counter = 0
+    while data_counter < len(keyword_clusters[cluster_counter]):
+        data = keyword_clusters[cluster_counter][data_counter]
+        insights = getRT_from_pint(data)
+        data_counter += 1
+
+    cluster_counter += 1
+    print('\n')
+
+print(perfect_tags_list)
+
+'''
