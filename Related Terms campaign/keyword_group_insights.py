@@ -1,7 +1,6 @@
 import requests
-#import json
-#import pandas as pd
 import time
+import pandas as pd
 
 food = ['Whey',
         'Cookie',
@@ -189,13 +188,14 @@ def match_keyword_toTag(keyword, potential_pin_tags):
         insight_index += 1
 
     print('NO EXACT MATCH FOUND\n')
-    return tags_containing_keyword[:20]
+    return tags_containing_keyword[:10]
 
 
 def get_similar_terms(matched_tag):
     index = 0
     diversity = -100
     insights = []
+    sorted_insights = []
 
     # similar insights
     if type(matched_tag) is str:
@@ -212,27 +212,21 @@ def get_similar_terms(matched_tag):
             # get insights
             pin_url = 'http://34.74.185.156:12001/pinterest/insights/similar?tags=' + keyword + '&d=' + str(diversity)
             response = requests.get(pin_url).json()
-            sim_num = response['data']['insights'][index][-1]
             print('INSIGHTS: ', response)
-            print('SIM: ', sim_num)
             print('\n')
 
             if diversity == -100:
                 dNeg_100_insights = response['data']['insights']
-                insights.append('D = -100:')
-                insights.append(dNeg_100_insights)
             if diversity == 0:
                 d_0_insights = response['data']['insights']
-                insights.append('D = 0:')
-                insights.append(d_0_insights)
             if diversity == 100:
-                d_100_insights = response['data']['insights']
-                # insights.append('D = 100:')
-                # insights.append(d_100_insights)
-                break
+                #d_100_insights = response['data']['insights']
+                sorted_insights = dNeg_100_insights + d_0_insights
+                sorted_insights.sort(key=lambda item: item[1], reverse=True)
+                for item in sorted_insights:
+                    insights.append(item[0])
+
             diversity += 100
-           # print('###################################')
-            #print('DIVERSITY = ', diversity)
     else:
         while index < len(matched_tag):
             while diversity <= 100:
@@ -249,38 +243,32 @@ def get_similar_terms(matched_tag):
                 # get insights
                 pin_url = 'http://34.74.185.156:12001/pinterest/insights/similar?tags='+keyword+'&d=' + str(diversity)
                 response = requests.get(pin_url).json()
-                sim_num = keyword['insights'][index][-1]
                 print('INSIGHTS: ', response)
-                print('SIM: ', sim_num)
                 print('\n')
-
 
                 if diversity == -100:
                     dNeg_100_insights = response['data']['insights']
-                    insights.append('D = -100:')
-                    insights.append(dNeg_100_insights)
                 if diversity == 0:
                     d_0_insights = response['data']['insights']
-                    insights.append('D = 0:')
-                    insights.append(d_0_insights)
                 if diversity == 100:
-                    d_100_insights = response['data']['insights']
-                    # insights.append('D = 100:')
-                    # insights.append(d_100_insights)
+                    #d_100_insights = response['data']['insights']
+                    new_insights = dNeg_100_insights + d_0_insights
+                    sorted_insights.extend(new_insights)
                     diversity = -100
                     break
 
                 diversity += 100
-                #print('###################################')
-               # print('DIVERSITY = ', diversity)
 
             index += 1
 
     # update values
-    #sorted_insights = response.sorted()
-    #print(sorted_insights)
+
+    sorted_insights.sort(key=lambda item: item[1], reverse=True)
+    for item in sorted_insights:
+        insights.append(item[0])
+
     return insights
-# todo work on merging total insights list, d=0 and d = -100
+
 
 def getRT_from_pint(data):
     counter = 0
@@ -288,39 +276,56 @@ def getRT_from_pint(data):
     perfect_tags = []
 
     while counter < data_len:
-
         ppTags = get_potential_tags(data[counter])
         if len(ppTags['data']['insights']) == 0:
             print('NO POTENTIAL TAGS FOUND!\n')
             counter += 1
             continue
-       # print('##########POTENTIAL TAGS##########')
-        #print(ppTags, '\n')
 
         matched_tags = match_keyword_toTag(data[counter], ppTags)
         print('##########TAGS###########')
         print(matched_tags, '\n')
+        #df['Tags'] = matched_tags  # writing to file
         if type(matched_tags) is str:
             perfect_tags.append(matched_tags)
+
 
         insights = get_similar_terms(matched_tags)
         print('DATA:', data[counter])
         print('TOTAL INSIGHTS:', insights, '\n')
+        #df['Insights'] = insights
 
         #time.sleep(3)
         counter += 1
 
     print('PERFECT TAGS', perfect_tags)
     #perfect_tags_list.append(perfect_tags)
-    return insights
+    # return insights
 
 
 # main
+# Index(['Keyword', 'Tags', 'Insights'], dtype='object')
+df = pd.read_csv('Step 2_ Pinterest insights for - Food - Sheet1.tsv', sep='\t')
 
-data = sports
-insights = getRT_from_pint(data)
+for index, row in list(df.iterrows()):
+    data = row['Keyword']
+    pTags = get_potential_tags(data)
+    print('POTENTIAL TAGS: ', pTags)
+    tags = match_keyword_toTag(data, pTags)
+    print('TAGS: ', tags)
+    row['Tags'] = tags
+    insights = get_similar_terms(tags)
+    print('INSIGHTS: ', insights)
+    row['Insights'] = insights
+    print(row, '\n')
+    df.iloc[index] = row
+
+df.to_csv('pin_insights_for_FOOD.tsv', sep='\t')
+print(df[:15])
 
 
+
+# TODO fix bug with pandas where perfect tags are not identified and written to the tsv file
 
 '''
 # loop to run thru all perfect tags
@@ -331,6 +336,8 @@ while counter < len(perfect_tags_list):
     data = perfect_tags_list[counter]
     insights = getRT_from_pint(data)
     counter += 1
+
+print(insights)
 '''
 '''
 # big loop to run thru all the clusters
@@ -351,5 +358,5 @@ while cluster_counter < len(keyword_clusters):
     print('\n')
 
 print(perfect_tags_list)
-
 '''
+
