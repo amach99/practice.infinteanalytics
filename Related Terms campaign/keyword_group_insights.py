@@ -138,7 +138,18 @@ videoGames = ['Overwatch (video game)',
               'Grand Theft Auto V',
               'Fortnite'
               ]
-
+'''
+perfect_tags_list = [['The matrix', 'Star trek', 'The hunger games', 'Logan', 'Iron man',
+                      'Deadpool', 'Marvel entertainment', 'Ghost rider', 'Fantastic four',
+                      'Iron man 3', 'The karate kid', 'Ghostbusters'],
+                     ['Devil may cry', 'Minecraft'],
+                     ['Luke skywalker', 'Iron man', 'Hulk', 'Spiderman'],
+                     ['Sachin tendulkar', 'Virat kohli', 'Cristiano ronaldo', 'Fifa world cup', 'Cricket world cup'],
+                     ['Katie holmes', 'Logan paul', 'Jennifer lawrence', 'Jason momoa', 'Morena baccarin'],
+                     ['Potato chip', 'Fried chicken', 'Pepsi', 'Mountain dew', 'Biscuits', 'Pineapple',
+                      'Bottled water', 'Kale', 'Coffeemaker', 'Watermelon', 'Ketchup', 'Cream soda', 'Pomegranate',
+                      'Lemon', 'Coca cola zero', 'Doritos', 'Diet coke']]
+'''
 nonFiction = [sports, entertainers, food]
 fiction = [movies, videoGames, fictional_char]
 
@@ -302,14 +313,19 @@ def getRT_from_pint(data):
     #perfect_tags_list.append(perfect_tags)
     # return insights
 
-
 # main
 # Index(['Keyword', 'Tags', 'Insights'], dtype='object')
-df = pd.read_csv('Step 2_ Pinterest insights for - Food - Sheet1.tsv', sep='\t')
+
+
+
+df = pd.read_csv('Step2_pinterest_insights_for_PerfectTags - Sheet1.tsv', sep='\t')
 
 for index, row in list(df.iterrows()):
     data = row['Keyword']
     pTags = get_potential_tags(data)
+    if len(pTags['data']['insights']) == 0:
+        row['Tags'] = 'NO POTENTIAL TAGS FOUND!'
+        continue
     print('POTENTIAL TAGS: ', pTags)
     tags = match_keyword_toTag(data, pTags)
     print('TAGS: ', tags)
@@ -320,9 +336,8 @@ for index, row in list(df.iterrows()):
     print(row, '\n')
     df.iloc[index] = row
 
-df.to_csv('pin_insights_for_FOOD.tsv', sep='\t')
+df.to_csv('pin_insights_for_PerfTags.tsv', sep='\t')
 print(df[:15])
-
 
 
 # TODO fix bug with pandas where perfect tags are not identified and written to the tsv file
