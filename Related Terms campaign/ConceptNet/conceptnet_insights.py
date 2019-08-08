@@ -143,16 +143,15 @@ videoGames = ['Overwatch (video game)',
               'Fortnite'
               ]
 
-perfect_tags_list = [['The matrix','Avengers comics', 'Star trek', 'The hunger games', 'Logan', 'Iron man',
-                      'Deadpool', 'Marvel entertainment', 'Ghost rider', 'Fantastic four', 'Thor film',
-                      'Iron man 3', 'The karate kid', 'Ghostbusters'],
-                     ['Overwatch video game','God of war series', 'Devil may cry', 'Minecraft'],
-                     ['Wolverine character', 'Luke skywalker', 'Iron man', 'Hulk', 'Spiderman'],
-                     ['Sachin tendulkar', 'Virat kohli', 'Cristiano ronaldo', 'Fifa world cup', 'Cricket world cup'],
-                     ['Katie holmes', 'Logan paul', 'Jennifer lawrence', 'Jason momoa', 'Morena baccarin'],
-                     ['Potato chip', 'Fried chicken', 'Pepsi', 'Mountain dew', 'Biscuits', 'Pineapple',
-                      'Bottled water', 'Kale', 'Coffeemaker', 'Watermelon', 'Ketchup', 'Cream soda', 'Pomegranate',
-                      'Lemon', 'Coca cola zero', 'Doritos', 'Diet coke']]
+perfect_tags_list = ['The matrix','Avengers comics', 'Star trek', 'The hunger games', 'Logan', 'Iron man',
+                     'Deadpool', 'Marvel entertainment', 'Ghost rider', 'Fantastic four', 'Thor film',
+                     'Iron man 3', 'The karate kid', 'Ghostbusters','Overwatch video game','God of war series',
+                     'Devil may cry', 'Minecraft', 'Wolverine character', 'Luke skywalker', 'Iron man', 'Hulk',
+                     'Spiderman', 'Sachin tendulkar', 'Virat kohli', 'Cristiano ronaldo', 'Fifa world cup',
+                     'Cricket world cup','Katie holmes', 'Logan paul', 'Jennifer lawrence', 'Jason momoa',
+                     'Morena baccarin', 'Potato chip', 'Fried chicken', 'Pepsi', 'Mountain dew', 'Biscuits',
+                     'Pineapple', 'Bottled water', 'Kale', 'Coffeemaker', 'Watermelon', 'Ketchup', 'Cream soda',
+                     'Pomegranate', 'Lemon', 'Coca cola zero', 'Doritos', 'Diet coke']
 
 nonFiction = [sports, entertainers, food]
 fiction = [movies, videoGames, fictional_char]
@@ -212,7 +211,7 @@ def get_related_urls(node):
 
         while edge_num < pg_len:
             # iterate thru edge nodes on page
-            print(edge_num)
+            #print(edge_num)
             edge = obj['edges'][edge_num]
             #print(edge)
             # check to see if url is valid and opens correctly
@@ -233,8 +232,6 @@ def get_related_urls(node):
             print('\n')
 
     return related_urls
-
-###########################################
 
 def get_insights(node: object, keyword: object) -> object:
     insights = []
@@ -418,14 +415,18 @@ def main_function(data):
         print(related_urls)
         counter += 1
         print('\n')
+        time.sleep(3)
 
-        return insights, related_urls
+    #return insights, related_urls
 
 ###########################################
 # Keyword   Node    Insights    URLs
 
+data = perfect_tags_list
+main_function(data)
 
-df = pd.read_csv('Step2_ conceptnet_insights for Sports - Sheet1.tsv', sep='\t')
+'''
+df = pd.read_csv('Step2_conceptnet_insights_for_PerfectTags - Sheet1.tsv', sep='\t')
 
 for index, row in list(df.iterrows()):
     keyword = row['Keyword']
@@ -446,9 +447,9 @@ for index, row in list(df.iterrows()):
     print(row, '\n')
     df.iloc[index] = row
 
-df.to_csv('conceptnet_insights_for_SPORTS.tsv', sep='\t')
+df.to_csv('conceptnet_insights_for_PerfTags.tsv', sep='\t')
 print(df[:15])
-
+'''
 
 '''
 # pandas loop
