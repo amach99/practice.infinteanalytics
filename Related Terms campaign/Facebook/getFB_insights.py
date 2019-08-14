@@ -4,6 +4,8 @@ import time
 import inflect
 p = inflect.engine()
 import pandas as pd
+from PyDictionary import PyDictionary
+dictionary = PyDictionary()
 
 food = ['Whey',
         'Cookie',
@@ -173,60 +175,78 @@ def getFB_nodeID(query, query_group):
     print('RECOMMENDATIONS', recoms, '\n')
 
     while counter < length:
-        print(recoms[counter][1:3])
+        # print(recoms[counter][1:3])
         nodeID = recoms[counter][-1]
         node_text = recoms[counter][1]
         node_group = recoms[counter][2]
-        node_pair = (node_text, node_group)
+        node = (node_text, node_group, nodeID)
+        print(node, '\n')
         if query.lower() in node_text.lower():
             if query.lower() == node_text.lower():
-                perfect_tag_id = nodeID
-                print('MATCH FOUND:', node_pair)
-                return perfect_tag_id
+                pFBtag = (node_text, nodeID)
+                print('MATCH FOUND:', node)
+                return pFBtag
             else:
                 lowercase_query_group = query_group.lower()
                 lowercase_node_group = node_group.lower()
                 result = p.compare(lowercase_query_group, lowercase_node_group)
                 if result == 'p:s':  # plural:singular
                     if p.singular_noun(lowercase_query_group) in lowercase_node_group:
-                        pFBtagID = nodeID
+                        pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
-                        potentialFBtags_IDlist.append(pFBtagID)
+                        potentialFBtags_IDlist.append(pFBtag)
                 elif result == 's:p':
                     if p.plural(lowercase_query_group) in lowercase_node_group:
-                        pFBtagID = nodeID
+                        pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
-                        potentialFBtags_IDlist.append(pFBtagID)
+                        potentialFBtags_IDlist.append(pFBtag)
                 elif result is False or result == 'eq':
-                    if lowercase_query_group in lowercase_node_group or p.singular_noun(lowercase_query_group) in lowercase_node_group:
-                        pFBtagID = nodeID
+                    if lowercase_query_group in lowercase_node_group:
+                        pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
-                        potentialFBtags_IDlist.append(pFBtagID)
+                        potentialFBtags_IDlist.append(pFBtag)
+                    if p.singular_noun(lowercase_query_group):  # evaluates to True or False
+                        if p.singular_noun(lowercase_query_group) in lowercase_node_group:
+                            pFBtag = (node_text, nodeID)
+                            # print('TAG: ', node_text, '\n')
+                            potentialFBtags_IDlist.append(pFBtag)
         counter += 1
 
     print(query)
     print(potentialFBtags_IDlist)
-
+    if len(potentialFBtags_IDlist) == 0:
+        return 1
     print('\n')
     print('#########################################################################')
     return potentialFBtags_IDlist
 
 
-def getFB_insights(nodeID, query_group):
+def getFB_insights(nodes, query_group):
     counter = 0
     related_terms = []
-    if type(nodeID) is str:
-        url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(nodeID)+'&b=0'
-        response = requests.get(url).json()
-        if response:
-            print('Success!')
-        else:
-            print('An error has occurred.')
-        a = pprint.isreadable(response)
-        print(a)
-        recommendations = response['data']['recommendations']
-        related_terms = word_comparison_check(recommendations, query_group)
-    elif type(nodeID) is int:
+    if nodes == 1:
+        return 1
+
+    if type(nodes) is list:
+        while counter < len(nodes):
+            nodeID = nodes[counter][-1]
+            url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
+            response = requests.get(url).json()
+            if response:
+                print('Success!')
+            else:
+                print('An error has occurred.')
+            a = pprint.isreadable(response)
+            print(a)
+            recommendations = response['data']['recommendations']
+            more_related_terms = word_comparison_check(recommendations, query_group)
+            if more_related_terms == 1:
+                return 1
+            related_terms.append(more_related_terms)
+            counter += 1
+
+    elif type(nodes[-1]) is str:
+        nodeID = nodes[-1]
         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
         response = requests.get(url).json()
         if response:
@@ -237,21 +257,19 @@ def getFB_insights(nodeID, query_group):
         print(a)
         recommendations = response['data']['recommendations']
         related_terms = word_comparison_check(recommendations, query_group)
-    else:
-        while counter < len(nodeID):
-            node = nodeID[counter]
-            url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(node)+'&b=0'
-            response = requests.get(url).json()
-            if response:
-                print('Success!')
-            else:
-                print('An error has occurred.')
-            a = pprint.isreadable(response)
-            print(a)
-            recommendations = response['data']['recommendations']
-            more_related_terms = word_comparison_check(recommendations, query_group)
-            related_terms.append(more_related_terms)
-            counter += 1
+
+    elif type(nodes[-1]) is int:
+        nodeID = nodes[-1]
+        url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
+        response = requests.get(url).json()
+        if response:
+            print('Success!')
+        else:
+            print('An error has occurred.')
+        a = pprint.isreadable(response)
+        print(a)
+        recommendations = response['data']['recommendations']
+        related_terms = word_comparison_check(recommendations, query_group)
 
     return related_terms
 
@@ -296,21 +314,33 @@ def word_comparison_check(recommendations, query_group):
             if p.singular_noun(lowercase_query_group) in lowercase_insight_node_group:
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
+                if pFBtag.isspace():
+                    print('INVALID TAG\n')
+                    continue
                 related_terms.append(pFBtag)
         elif result == 's:p':  # singular:plural
             if p.plural(lowercase_query_group) in lowercase_insight_node_group:
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
+                if pFBtag.isspace():
+                    print('INVALID TAG\n')
+                    continue
                 related_terms.append(pFBtag)
         elif result is False or result == 'eq':
             if lowercase_query_group in lowercase_insight_node_group:
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
+                if pFBtag.isspace():
+                    print('INVALID TAG\n')
+                    continue
                 related_terms.append(pFBtag)
         print(insight_node)
         node_counter += 1
 
-    return related_terms
+    if len(related_terms) == 0:
+        return 1
+    else:
+        return related_terms
 
 
 def FB_insights(query):
@@ -328,7 +358,7 @@ def FB_insights(query):
 
     print('QUERY:', query)
     print('Q_GROUP:', query_group)
-    if len(insights) == 0:
+    if insights == 1:
         print('ERROR: NO INSIGHTS FOUND\n')
     else:
         print('INSIGHTS:', insights)
@@ -337,7 +367,7 @@ def FB_insights(query):
 
 
 def main():
-    df = pd.read_csv('facebook_insights_for_PerfTags - Sheet1.tsv', sep='\t')
+    df = pd.read_csv('facebook_insights_for_PerfTags_input.tsv', sep='\t')
 
     for index, row in list(df.iterrows()):
         query = row['QUERY']
@@ -348,10 +378,17 @@ def main():
         else:
             row['Q_GROUP'] = query_group
         if tags == 1:
-            row['TAGS'] = 'ERROR: NO POTENTIAL TAGS'
+            row['TAG'] = 'ERROR: NO POTENTIAL TAGS'
         else:
-            row['TAGS'] = tags
-        if len(insights) == 0:
+            if type(tags) is list:
+                tag_name, tag_id = zip(*tags)
+                row['TAG'] = pd.array(tag_name, dtype=object)
+                row['TAGID'] = pd.array(tag_id, dtype=object)
+            else:
+                row['TAG'] = tags[0]
+                row['TAGID'] = tags[-1]
+
+        if insights == 1 or len(insights) == 0:
             row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
         elif tags == 1:
             row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
@@ -364,16 +401,53 @@ def main():
     df.to_csv('FB_insights_for_PerfTags.tsv', sep='\t')
     print(df[:15])
 
-
-    # for item in perfect_tags_list:
-    #     FB_insights(item)
-    #     time.sleep(5)
-
     return 0
 
 # todo work on sorting insights
 # TODO add tag name category to pandas df
 
+# def getFB_insights(nodeID, query_group):
+#     counter = 0
+#     related_terms = []
+#     if type(nodeID) is str:
+#         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(nodeID)+'&b=0'
+#         response = requests.get(url).json()
+#         if response:
+#             print('Success!')
+#         else:
+#             print('An error has occurred.')
+#         a = pprint.isreadable(response)
+#         print(a)
+#         recommendations = response['data']['recommendations']
+#         related_terms = word_comparison_check(recommendations, query_group)
+#     elif type(nodeID) is int:
+#         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
+#         response = requests.get(url).json()
+#         if response:
+#             print('Success!')
+#         else:
+#             print('An error has occurred.')
+#         a = pprint.isreadable(response)
+#         print(a)
+#         recommendations = response['data']['recommendations']
+#         related_terms = word_comparison_check(recommendations, query_group)
+#     else:
+#         while counter < len(nodeID):
+#             node = nodeID[counter]
+#             url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(node)+'&b=0'
+#             response = requests.get(url).json()
+#             if response:
+#                 print('Success!')
+#             else:
+#                 print('An error has occurred.')
+#             a = pprint.isreadable(response)
+#             print(a)
+#             recommendations = response['data']['recommendations']
+#             more_related_terms = word_comparison_check(recommendations, query_group)
+#             related_terms.append(more_related_terms)
+#             counter += 1
+#
+#     return related_terms
 
 
 if __name__ == '__main__':
