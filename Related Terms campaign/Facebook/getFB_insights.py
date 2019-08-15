@@ -1,12 +1,10 @@
 import requests
-import pprint
-import time
 import inflect
 p = inflect.engine()
 import pandas as pd
-from PyDictionary import PyDictionary
-dictionary = PyDictionary()
+from nltk.corpus import wordnet
 
+# Keyword clusters
 food = ['Whey',
         'Cookie',
         'Frito-Lay',
@@ -120,7 +118,7 @@ movies = ['Inception',
 fictional_char = ['Wolverine (character)',
                   'Luke Skywalker',
                   'Doctor Strange',
-                  'Iron Man',
+                  'Iron Man (character)',
                   'Hulk',
                   'Spiderman'
                   ]
@@ -151,11 +149,60 @@ fiction = [movies, videoGames, fictional_char]
 clusters = [fiction, nonFiction]
 
 
-# fb api
-# curl 'http://34.74.185.156:12002/facebook/insights/containing?query=kaffary&k=500'
-# curl 'http://34.74.185.156:12002/facebook/insights/similar?page_id=6530823&b=0'
+# given a keyword (query) this function searches thru the keyword clusters and returns the name of the correct group
+# that the keyword belongs too and a list of synonyms for the name of the keyword group
+def get_query_group(query):
+    query_groupID = [('food', id(food)),
+                     ('sports', id(sports)),
+                     ('movies', id(movies)),
+                     ('entertainers', id(entertainers)),
+                     ('video games', id(videoGames)),
+                     ('fictional characters', id(fictional_char))]
+
+    for element in clusters:
+        for item in element:
+            itemID = id(item)
+            for value in item:
+                if '(' in value:
+                    value = value.replace('(', '')
+                if ')' in value:
+                    value = value.replace(')', '')
+                if query.lower() == value.lower():
+                    print(itemID, ':', value)
+                    for index in query_groupID:
+                        if itemID == index[1]:
+                            syn_list = get_syn(index[0])
+                            print(index[0], syn_list)
+                            print('Q_GROUP:', index[0])
+                            return index[0], syn_list
+
+    print('ERROR: NO MATCHING QUERY GROUP FOR,' + query + '\n')
+    return 1
 
 
+# imported the wordnet to get synonyms for query groups, an attempt to increase the # of related terms for keywords
+# used in get_query_group function
+# INPUT: word = query group name
+def get_syn(word):
+    synonyms = []
+
+    for syn in wordnet.synsets(word):
+        for l in syn.lemmas():
+            name = l.name()
+            if '_' in l.name():
+                name = l.name().replace('_', ' ')
+            if name in synonyms:  # if duplicate synonym, skip it
+                continue
+            else:
+                synonyms.append(name)
+
+    return synonyms[:10]
+
+
+# uses 'http://34.74.185.156:12002/facebook/insights/containing?query=kaffary&k=500' to find a tag that contains
+# a specific keyword we want
+# INPUT: query = keyword that we want to get related terms for
+#        query_group = cluster that keyword is located in  (see above for keyword clusters)
 def getFB_nodeID(query, query_group):
     counter = 0
     potentialFBtags_IDlist = []
@@ -165,20 +212,19 @@ def getFB_nodeID(query, query_group):
         print('Success!')
     else:
         print('An error has occurred.')
-    a = pprint.isreadable(response)
-    print(a)
     length = len(response['data']['recommendations'])
     if length == 0:
         print('ERROR: NO POTENTIAL TAGS!')
-        return 1
-    recoms = response['data']['recommendations']
-    print('RECOMMENDATIONS', recoms, '\n')
+        return 1  # early exit if no tags containing the keyword are found
+    recommendations = response['data']['recommendations']
+    print('RECOMMENDATIONS', recommendations, '\n')
+    # recommendations are all available tags containing the keyword, can that can be used to get more related terms
 
+    # this loop finds potential matches and adds the to the potentialFBtags_IDlist
     while counter < length:
-        # print(recoms[counter][1:3])
-        nodeID = recoms[counter][-1]
-        node_text = recoms[counter][1]
-        node_group = recoms[counter][2]
+        nodeID = recommendations[counter][-1]
+        node_text = recommendations[counter][1]
+        node_group = recommendations[counter][2]
         node = (node_text, node_group, nodeID)
         print(node, '\n')
         if query.lower() in node_text.lower():
@@ -186,7 +232,10 @@ def getFB_nodeID(query, query_group):
                 pFBtag = (node_text, nodeID)
                 print('MATCH FOUND:', node)
                 return pFBtag
+                # if a tag is found that is exactly the same as the keyword, pFBtag is returned and the function ends
             else:
+                # imported the inflect library to compare words and find matches even if words are not identical
+                # for example movies and movie would would compared and determined to be different versions of the same word
                 lowercase_query_group = query_group.lower()
                 lowercase_node_group = node_group.lower()
                 result = p.compare(lowercase_query_group, lowercase_node_group)
@@ -195,12 +244,12 @@ def getFB_nodeID(query, query_group):
                         pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
                         potentialFBtags_IDlist.append(pFBtag)
-                elif result == 's:p':
+                elif result == 's:p':  # singular:plural
                     if p.plural(lowercase_query_group) in lowercase_node_group:
                         pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
                         potentialFBtags_IDlist.append(pFBtag)
-                elif result is False or result == 'eq':
+                elif result is False or result == 'eq':  # if different words check if keyword exists in node text
                     if lowercase_query_group in lowercase_node_group:
                         pFBtag = (node_text, nodeID)
                         # print('TAG: ', node_text, '\n')
@@ -219,46 +268,63 @@ def getFB_nodeID(query, query_group):
     print('\n')
     print('#########################################################################')
     return potentialFBtags_IDlist
+    # if no perfect tag is found, a list of potential tags is returned
 
 
-def getFB_insights(nodes, query_group):
+# this function uses 'http://34.74.185.156:12002/facebook/insights/similar?page_id=6530823&b=0' to get similar terms
+# INPUT: nodes = potentialFBtags_IDlist or pFBtag (perfect match)
+#        query_group = cluster that keyword is located in (see above for keyword clusters)
+#        syn_list = list of synonyms for query_group word
+def getFB_insights(nodes, query_group, syn_list):
     counter = 0
     related_terms = []
     if nodes == 1:
-        return 1
+        return 1  # if potentialFBtagsID_list is empty return 1 for no possible insights
 
-    if type(nodes) is list:
+    if type(nodes) is list:  # if multiple potential tags run thru the list and get insights for each one
         while counter < len(nodes):
             nodeID = nodes[counter][-1]
-            url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
+            url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=50'
             response = requests.get(url).json()
             if response:
                 print('Success!')
             else:
                 print('An error has occurred.')
-            a = pprint.isreadable(response)
-            print(a)
             recommendations = response['data']['recommendations']
+            # all potential related tags for a matched containing tag
             more_related_terms = word_comparison_check(recommendations, query_group)
-            if more_related_terms == 1:
-                return 1
-            related_terms.append(more_related_terms)
+            if len(more_related_terms) > 0 and more_related_terms != 1:
+                related_terms.extend(more_related_terms)
+                # compares related tag group with query_group word
+
+                # compares potentially related tag group with synonyms of query_group in an attempt
+                # to get more meaningful matches
+            for term in syn_list:
+                more_related_terms = word_comparison_check(recommendations, term)
+                if len(more_related_terms) > 1:
+                    related_terms.extend(more_related_terms)
             counter += 1
 
-    elif type(nodes[-1]) is str:
+    elif type(nodes[-1]) is str:  # if only one potential tag, or a perfect tag is returned to us, get insights
         nodeID = nodes[-1]
-        url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
+        url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=50'
         response = requests.get(url).json()
         if response:
             print('Success!')
         else:
             print('An error has occurred.')
-        a = pprint.isreadable(response)
-        print(a)
-        recommendations = response['data']['recommendations']
+        recommendations = response['data']['recommendations']  # all potential related tags for a matched containing tag
         related_terms = word_comparison_check(recommendations, query_group)
+        # compares related tag group with query_group word
 
-    elif type(nodes[-1]) is int:
+        # compares potentially related tag group with synonyms of query_group in an attempt
+        # to get more meaningful matches
+        for term in syn_list:
+            more_related_terms = word_comparison_check(recommendations, term)
+            if len(more_related_terms) > 1:
+                related_terms.extend(more_related_terms)
+
+    elif type(nodes[-1]) is int:  # may or not be necessary, wrote this statement just in case to cover potential bugs
         nodeID = nodes[-1]
         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
         response = requests.get(url).json()
@@ -266,40 +332,31 @@ def getFB_insights(nodes, query_group):
             print('Success!')
         else:
             print('An error has occurred.')
-        a = pprint.isreadable(response)
-        print(a)
         recommendations = response['data']['recommendations']
         related_terms = word_comparison_check(recommendations, query_group)
+        # compares related tag group with query_group word
+
+        # compares potentially related tag group with synonyms of query_group in an attempt
+        # to get more meaningful matches
+        for term in syn_list:
+            more_related_terms = word_comparison_check(recommendations, term)
+            if len(more_related_terms) > 1:
+                related_terms.extend(more_related_terms)
+
+    try:  # gets rid of duplicate terms in the final related terms list by making it a set
+        related_terms = set(related_terms)
+    except TypeError:
+        print(related_terms)
+        return 3000  # random number so I know what went wrong
 
     return related_terms
 
 
-def get_query_group(query):
-    query_groupID = [('food', id(food)),
-                     ('sports',  id(sports)),
-                     ('movies', id(movies)),
-                     ('entertainers', id(entertainers)),
-                     ('video games', id(videoGames)),
-                     ('fictional characters', id(fictional_char))]
-
-    for element in clusters:
-        for item in element:
-            itemID = id(item)
-            for value in item:
-                if '(' in value:
-                    value = value.replace('(', '')
-                if ')' in value:
-                    value = value.replace(')', '')
-                if query.lower() == value.lower():
-                    print(itemID, ':', value)
-                    for index in query_groupID:
-                        if itemID == index[1]:
-                            print('Q_GROUP:', index[0])
-                            return index[0]
-    print('ERROR: NO MATCHING QUERY GROUP FOR,'+query+'\n')
-    return 1
-
-
+# imported the inflect library to compare words and find matches even if words are not identical
+# for example movies and movie would would compared and determined to be different versions of the same word
+# used in getFB_insights function
+# INPUT: recommendations = potential related terms that need to be filtered
+#        query_group = name of keyword group that the query belongs too
 def word_comparison_check(recommendations, query_group):
     related_terms = []
     node_counter = 0
@@ -307,11 +364,19 @@ def word_comparison_check(recommendations, query_group):
         insight_node = recommendations[node_counter]
         insight_node_group = insight_node[2]
         insight_node_text = insight_node[1]
+        if insight_node_text.isascii() is False:  # TODO need to implement some kind of decode method here
+            # insight_node_text = insight_node_text.encode()
+            # d_insight_node_text = decode(insight_node_text)
+            print('NON ASCII TEXT:', insight_node_text)
+            node_counter += 1  # if non ascii text is found, just skip that tag
+            continue
         lowercase_query_group = query_group.lower()
         lowercase_insight_node_group = insight_node_group.lower()
         result = p.compare(lowercase_query_group, lowercase_insight_node_group)
+
         if result == 'p:s':  # plural:singular
-            if p.singular_noun(lowercase_query_group) in lowercase_insight_node_group:
+            if p.singular_noun(
+                    lowercase_query_group) in lowercase_insight_node_group:  # now comparing singular:singular
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
                 if pFBtag.isspace():
@@ -319,14 +384,14 @@ def word_comparison_check(recommendations, query_group):
                     continue
                 related_terms.append(pFBtag)
         elif result == 's:p':  # singular:plural
-            if p.plural(lowercase_query_group) in lowercase_insight_node_group:
+            if p.plural(lowercase_query_group) in lowercase_insight_node_group:  # now comparing plural:plural
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
                 if pFBtag.isspace():
                     print('INVALID TAG\n')
                     continue
                 related_terms.append(pFBtag)
-        elif result is False or result == 'eq':
+        elif result is False or result == 'eq':  # if different words check if keyword exists in node text
             if lowercase_query_group in lowercase_insight_node_group:
                 pFBtag = insight_node_text
                 print('TAG: ', pFBtag, '\n')
@@ -334,40 +399,49 @@ def word_comparison_check(recommendations, query_group):
                     print('INVALID TAG\n')
                     continue
                 related_terms.append(pFBtag)
+            if p.singular_noun(lowercase_query_group):  # evaluates to True or False
+                if p.singular_noun(lowercase_query_group) in lowercase_insight_node_group:
+                    pFBtag = insight_node_text
+                    # print('TAG: ', node_text, '\n')
+                    related_terms.append(pFBtag)
         print(insight_node)
         node_counter += 1
 
-    if len(related_terms) == 0:
-        return 1
-    else:
-        return related_terms
+    return related_terms
 
 
+# main loop to get related terms for a keyword, runs thru all the functions
+# INPUT: query = keyword
 def FB_insights(query):
-    query_group = get_query_group(query)
+    query_group, syn_list = get_query_group(query)
     insights_id = getFB_nodeID(query, query_group)
     if insights_id == 1:
-        insights = []
+        insights = 1  # in no potential tags are found, set insights to none as well
         return query_group, insights_id, insights
-    if type(insights_id) is list:
+
+    if type(insights_id) is list:  # if multiple possible results are found, get insights for each
         print('MULTIPLE IDS:', insights_id)
-        insights = getFB_insights(insights_id, query_group)
+        insights = getFB_insights(insights_id, query_group, syn_list)
     else:
         print('ID:', insights_id)
-        insights = getFB_insights(insights_id, query_group)
+        insights = getFB_insights(insights_id, query_group, syn_list)
 
     print('QUERY:', query)
     print('Q_GROUP:', query_group)
     if insights == 1:
         print('ERROR: NO INSIGHTS FOUND\n')
+    elif insights == 3000:  # error occured when making related terms list into a set
+        print('TYPE ERROR!')
+        insights = 1
     else:
         print('INSIGHTS:', insights)
 
     return query_group, insights_id, insights
 
-
+# imported pandas to create a df to display results for each keyword
+# pandas headers: [QUERY] [Q_GROUP] [TAG] [TAGID] [INSIGHTS]
 def main():
-    df = pd.read_csv('facebook_insights_for_PerfTags_input.tsv', sep='\t')
+    df = pd.read_csv('facebook_insights_for_PerfTags_input.tsv', sep='\t')  # change input file
 
     for index, row in list(df.iterrows()):
         query = row['QUERY']
@@ -398,56 +472,10 @@ def main():
         print(row, '\n')
         df.iloc[index] = row
 
-    df.to_csv('FB_insights_for_PerfTags.tsv', sep='\t')
+    df.to_csv('FB_insights_for_PerfTags.tsv', sep='\t')  # change to whatever to create pandas df
     print(df[:15])
 
     return 0
-
-# todo work on sorting insights
-# TODO add tag name category to pandas df
-
-# def getFB_insights(nodeID, query_group):
-#     counter = 0
-#     related_terms = []
-#     if type(nodeID) is str:
-#         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(nodeID)+'&b=0'
-#         response = requests.get(url).json()
-#         if response:
-#             print('Success!')
-#         else:
-#             print('An error has occurred.')
-#         a = pprint.isreadable(response)
-#         print(a)
-#         recommendations = response['data']['recommendations']
-#         related_terms = word_comparison_check(recommendations, query_group)
-#     elif type(nodeID) is int:
-#         url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id=' + str(nodeID) + '&b=0'
-#         response = requests.get(url).json()
-#         if response:
-#             print('Success!')
-#         else:
-#             print('An error has occurred.')
-#         a = pprint.isreadable(response)
-#         print(a)
-#         recommendations = response['data']['recommendations']
-#         related_terms = word_comparison_check(recommendations, query_group)
-#     else:
-#         while counter < len(nodeID):
-#             node = nodeID[counter]
-#             url = 'http://34.74.185.156:12002/facebook/insights/similar?page_id='+str(node)+'&b=0'
-#             response = requests.get(url).json()
-#             if response:
-#                 print('Success!')
-#             else:
-#                 print('An error has occurred.')
-#             a = pprint.isreadable(response)
-#             print(a)
-#             recommendations = response['data']['recommendations']
-#             more_related_terms = word_comparison_check(recommendations, query_group)
-#             related_terms.append(more_related_terms)
-#             counter += 1
-#
-#     return related_terms
 
 
 if __name__ == '__main__':
