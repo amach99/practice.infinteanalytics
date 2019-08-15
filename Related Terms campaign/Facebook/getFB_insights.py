@@ -266,6 +266,8 @@ def getFB_nodeID(query, query_group):
         nodeID = recommendations[counter][-1]
         node_text = recommendations[counter][1]
         node_group = recommendations[counter][2]
+        if '/' in node_group:
+            node_group = node_group.replace('/', ' ')
         node = (node_text, node_group, nodeID)
         print(node, '\n')
         if query.lower() in node_text.lower():
@@ -404,6 +406,8 @@ def word_comparison_check(recommendations, query_group):
     while node_counter < len(recommendations):
         insight_node = recommendations[node_counter]
         insight_node_group = insight_node[2]
+        if '/' in insight_node_group:
+            insight_node_group = insight_node_group.replace('/', ' ')
         insight_node_text = insight_node[1]
         if insight_node_text.isascii() is False:  # TODO need to implement some kind of decode method here
             # insight_node_text = insight_node_text.encode()

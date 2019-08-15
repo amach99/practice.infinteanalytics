@@ -7,6 +7,7 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 import time
 import requests
 
+# keyword clusters
 food = ['Whey',
         'Cookie',
         'Frito-Lay',
@@ -124,7 +125,6 @@ fictional_char = ['Wolverine (character)',
                   'Hulk',
                   'Spiderman'
                   ]
-
 videoGames = ['Overwatch (video game)',
               'Uncharted',
               'Devil May Cry',
@@ -138,7 +138,6 @@ videoGames = ['Overwatch (video game)',
               'Grand Theft Auto V',
               'Fortnite'
               ]
-
 perfect_tags_list = ['The matrix','Avengers comics', 'Star trek', 'The hunger games', 'Logan', 'Iron man',
                      'Deadpool', 'Marvel entertainment', 'Ghost rider', 'Fantastic four', 'Thor film',
                      'Iron man 3', 'The karate kid', 'Ghostbusters','Overwatch video game','God of war series',
@@ -148,10 +147,11 @@ perfect_tags_list = ['The matrix','Avengers comics', 'Star trek', 'The hunger ga
                      'Morena baccarin', 'Potato chip', 'Fried chicken', 'Pepsi', 'Mountain dew', 'Biscuits',
                      'Pineapple', 'Bottled water', 'Kale', 'Coffeemaker', 'Watermelon', 'Ketchup', 'Cream soda',
                      'Pomegranate', 'Lemon', 'Coca cola zero', 'Doritos', 'Diet coke']
-
 nonFiction = [sports, entertainers, food]
 fiction = [movies, videoGames, fictional_char]
 
+# given a keyword, this function finds potential nodes
+# INPUT: keyword = word that we want to find related terms for
 def get_node(keyword):
     if '(' in keyword:
         keyword = keyword.replace('(', '')
@@ -164,23 +164,26 @@ def get_node(keyword):
     CN_node = urllib.request.urlopen(CN_node_url)
     node = json.load(CN_node)
 
-    node_check_url = 'http://api.conceptnet.io/'+node['@id']
+    node_check_url = 'http://api.conceptnet.io/'+node['@id']  # check to see if node is legitimate
     node_check = urllib.request.urlopen(node_check_url)
     checked_node = json.load(node_check)
 
     if checked_node.get('error') is not None:
         return None
-    else:
+    else:  # if node is verified return it
         node_key = checked_node['@id']
         return node_key
 
+
+# iterates thru the nodes and if a url link is found, it stores it for the pandas df
+# INPUT: node = matched node to keyword that is returned from get_node() function
 def get_related_urls(node):
     related_urls = []
     conceptnet_url = 'http://api.conceptnet.io/'+node+'?format=json'
     obj = requests.get(conceptnet_url).json()
     dict_keys = obj.keys()
     pg_len = len(obj['edges'])
-    edge_num = 1  # conceptnet node number ( 20 per pg )
+    edge_num = 1  # conceptnet node number (20 per pg)
     stop_loop = 0
 
     while stop_loop is 0:
@@ -205,13 +208,11 @@ def get_related_urls(node):
         else:
             stop_loop = 1
 
-        while edge_num < pg_len:
-            # iterate thru edge nodes on page
+        while edge_num < pg_len:  # iterate thru edge nodes on page
             #print(edge_num)
             edge = obj['edges'][edge_num]
             #print(edge)
-            # check to see if url is valid and opens correctly
-            if 'site_available' in edge['end']:
+            if 'site_available' in edge['end']:   # check to see if url is valid and opens correctly
                 if edge['end']['site_available'] is True:
                     #print(edge)
                     potential_url = obj['edges'][edge_num]['end']['@id']
@@ -229,6 +230,10 @@ def get_related_urls(node):
 
     return related_urls
 
+
+# gets insights for a keyword given a matched node
+# INPUT: node = matched node from get_node() function
+#        keyword = original keyword used to get node
 def get_insights(node: object, keyword: object) -> object:
     insights = []
     conceptnet_url = 'http://api.conceptnet.io'+node+'?format=json'
@@ -241,8 +246,7 @@ def get_insights(node: object, keyword: object) -> object:
     stop_check = 0
 
     while stop_check is 0:
-        if 'view' in dict_keys:
-            # move on to next page
+        if 'view' in dict_keys:   # move on to next page
             if 'nextPage' in data['view']:
                 nextPG = 'http://api.conceptnet.io' + data['view']['nextPage']
 
@@ -256,7 +260,7 @@ def get_insights(node: object, keyword: object) -> object:
                         continue
                     elif status == 404:
                         print('Not Found. Failed to open next page\n')
-         # if link to next page is not found, sets the loop to run one more time for the last page
+            # if link to next page is not found, sets the loop to run one more time for the last page
             else:
                 stop_check = 1
         else:
@@ -272,7 +276,7 @@ def get_insights(node: object, keyword: object) -> object:
                 label = label.replace('_', ' ')
             if 'language' in edge['start']:
                 language = edge['start']['language']
-                if language != 'en':
+                if language != 'en':  # check to make sure language is english
                     #print('LANGUAGE ERROR: ', language)
                     edge_counter += 1
                     continue
@@ -294,7 +298,7 @@ def get_insights(node: object, keyword: object) -> object:
 
                     jd = nltk.jaccard_distance(jaccard_set1, jaccard_set2)
 
-            # if insight is too similar, move on to the next insight
+                    # if insight is too similar, move on to the next insight
                     if jd < 0.3 or lowercase_interest.find(label) > -1:
                         edge_counter += 1
                         continue
@@ -326,17 +330,21 @@ def get_insights(node: object, keyword: object) -> object:
             else:
                 edge_counter += 1
                 continue
-
+    # after insights are filtered, return final insights list
     return insights[:25]   # change this line to determine how many insights to return
 
+# uses a different api to get more related terms
+# INPUT: node = matched node from get_node() function
+#        insights = list of related terms from get_insights function
 def get_more_related_terms(node, insights):
     # related terms api
     obj = requests.get('http://api.conceptnet.io/related/' + node).json()
     edge_counter = 0
     pg_len = len(obj['related'])
-    while edge_counter < pg_len:
-        #print(obj['related'][edge_counter])
-        #weight = obj['related'][edge_counter]['weight']
+
+    while edge_counter < pg_len:  # uses jaccard distance and nltk stemming to filter insights
+        # print(obj['related'][edge_counter])
+        # weight = obj['related'][edge_counter]['weight']
         term = obj['related'][edge_counter]['@id']
         split_term = term.split('/')
         if 'en' not in split_term:
@@ -358,11 +366,10 @@ def get_more_related_terms(node, insights):
             jaccard_set1 = set(split_term[-1])
 
         #print(jaccard_set1, jaccard_set2)
-
         jd = nltk.jaccard_distance(jaccard_set1, jaccard_set2)
+        # print('JD #: ', jd)
 
         # if insight is too similar, move on to the next insight
-        #print('JD #: ', jd)
         if jd < 0.3 or lowercase_interest.find(split_term[-1]) > -1:
             edge_counter += 1
             continue
@@ -371,13 +378,13 @@ def get_more_related_terms(node, insights):
         ps = PorterStemmer()
         insight_word_stem = word_tokenize(split_term[-1])
         query_word_stem = word_tokenize(lowercase_interest)
-        #print(insight_word_stem, query_word_stem)
+        # print(insight_word_stem, query_word_stem)
         stop_loop = 0
         for word in query_word_stem:
             if stop_loop == 0:
                 query_root = ps.stem(word)
-                for word in insight_word_stem:
-                    insight_root = ps.stem(word)
+                for term in insight_word_stem:
+                    insight_root = ps.stem(term)
                     if query_root == insight_root:
                         stop_loop = 1
                         break
@@ -391,6 +398,8 @@ def get_more_related_terms(node, insights):
         edge_counter += 1
     return insights[:15]
 
+# main function just to run thru all the functions in the correct order
+# INPUT: data = a keyword group (see top of page)
 def main_function(data):
     counter = 0
     data_len = len(data)
@@ -420,6 +429,7 @@ def main_function(data):
 
 data = perfect_tags_list
 main_function(data)
+
 
 '''
 df = pd.read_csv('Step2_conceptnet_insights_for_PerfectTags - Sheet1.tsv', sep='\t')
