@@ -53,7 +53,6 @@ food = ['Whey',
         'powerade',
         'thumbs up'
         ]
-
 sports = ['Sachin Tendulkar',
           'Virat Kohli',
           'Cristiano Ronaldo',
@@ -69,7 +68,6 @@ sports = ['Sachin Tendulkar',
           'football',
           'copa del rey'
           ]
-
 entertainers = ['Katie Holmes',
                 'Leonardo DiCaprio',
                 'Nelly',
@@ -81,7 +79,6 @@ entertainers = ['Katie Holmes',
                 'Jason Momoa',
                 'Morena Baccarin'
                 ]
-
 movies = ['Inception',
           'Doctor Strange',
           'The Matrix',
@@ -120,7 +117,6 @@ movies = ['Inception',
           'The karate kid',
           'Ghostbusters'
           ]
-
 fictional_char = ['Wolverine (character)',
                   'Luke Skywalker',
                   'Doctor Strange',

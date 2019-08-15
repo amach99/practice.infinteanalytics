@@ -149,6 +149,47 @@ fiction = [movies, videoGames, fictional_char]
 clusters = [fiction, nonFiction]
 
 
+# imported pandas to create a df to display results for each keyword
+# pandas headers: [QUERY] [Q_GROUP] [TAG] [TAGID] [INSIGHTS]
+def main():
+    df = pd.read_csv('facebook_insights_for_PerfTags - Sheet1.tsv', sep='\t')  # change input file
+
+    for index, row in list(df.iterrows()):
+        query = row['QUERY']
+        query_group, tags, insights = FB_insights(query)  # getting data
+
+        # writing to pandas df
+        if query_group == 1:
+            row['Q_GROUP'] = 'ERROR: NO MATCHING QUERY GROUP'
+        else:
+            row['Q_GROUP'] = query_group
+        if tags == 1:
+            row['TAG'] = 'ERROR: NO POTENTIAL TAGS'
+        else:
+            if type(tags) is list:
+                tag_name, tag_id = zip(*tags)
+                row['TAG'] = pd.array(tag_name, dtype=object)
+                row['TAGID'] = pd.array(tag_id, dtype=object)
+            else:
+                row['TAG'] = tags[0]
+                row['TAGID'] = tags[-1]
+
+        if insights == 1 or len(insights) == 0:
+            row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
+        elif tags == 1:
+            row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
+        else:
+            row['INSIGHTS'] = insights
+
+        print(row, '\n')
+        df.iloc[index] = row
+
+    df.to_csv('FB_insights_for_PerfTags.tsv', sep='\t')  # change to whatever to create pandas df
+    print(df[:15])
+
+    return 0
+
+
 # given a keyword (query) this function searches thru the keyword clusters and returns the name of the correct group
 # that the keyword belongs too and a list of synonyms for the name of the keyword group
 def get_query_group(query):
@@ -402,8 +443,8 @@ def word_comparison_check(recommendations, query_group):
             if p.singular_noun(lowercase_query_group):  # evaluates to True or False
                 if p.singular_noun(lowercase_query_group) in lowercase_insight_node_group:
                     pFBtag = insight_node_text
-                    # print('TAG: ', node_text, '\n')
                     related_terms.append(pFBtag)
+
         print(insight_node)
         node_counter += 1
 
@@ -437,45 +478,6 @@ def FB_insights(query):
         print('INSIGHTS:', insights)
 
     return query_group, insights_id, insights
-
-# imported pandas to create a df to display results for each keyword
-# pandas headers: [QUERY] [Q_GROUP] [TAG] [TAGID] [INSIGHTS]
-def main():
-    df = pd.read_csv('facebook_insights_for_PerfTags_input.tsv', sep='\t')  # change input file
-
-    for index, row in list(df.iterrows()):
-        query = row['QUERY']
-        query_group, tags, insights = FB_insights(query)
-
-        if query_group == 1:
-            row['Q_GROUP'] = 'ERROR: NO MATCHING QUERY GROUP'
-        else:
-            row['Q_GROUP'] = query_group
-        if tags == 1:
-            row['TAG'] = 'ERROR: NO POTENTIAL TAGS'
-        else:
-            if type(tags) is list:
-                tag_name, tag_id = zip(*tags)
-                row['TAG'] = pd.array(tag_name, dtype=object)
-                row['TAGID'] = pd.array(tag_id, dtype=object)
-            else:
-                row['TAG'] = tags[0]
-                row['TAGID'] = tags[-1]
-
-        if insights == 1 or len(insights) == 0:
-            row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
-        elif tags == 1:
-            row['INSIGHTS'] = 'ERROR: NO INSIGHTS'
-        else:
-            row['INSIGHTS'] = insights
-
-        print(row, '\n')
-        df.iloc[index] = row
-
-    df.to_csv('FB_insights_for_PerfTags.tsv', sep='\t')  # change to whatever to create pandas df
-    print(df[:15])
-
-    return 0
 
 
 if __name__ == '__main__':
