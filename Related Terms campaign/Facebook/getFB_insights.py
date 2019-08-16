@@ -475,7 +475,7 @@ def FB_insights(query):
     print('Q_GROUP:', query_group)
     if insights == 1:
         print('ERROR: NO INSIGHTS FOUND\n')
-    elif insights == 3000:  # error occured when making related terms list into a set
+    elif insights == 3000:  # error occurred when making related terms list into a set
         print('TYPE ERROR!')
         insights = 1
     else:
