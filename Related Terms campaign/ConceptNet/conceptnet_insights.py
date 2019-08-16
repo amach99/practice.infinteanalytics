@@ -8,7 +8,7 @@ import time
 import requests
 
 # keyword clusters
-food = ['Whey',
+food = [ 'Whey',
         'Cookie',
         'Frito-Lay',
         'Potato chip',
@@ -406,14 +406,15 @@ def get_more_related_terms(node, insights):
 def main_function(data):
     counter = 0
     data_len = len(data)
-    while counter < data_len:
-        keyword = data[counter]
+
+    if data is str:
+        keyword = data
         node = get_node(keyword)
         print('NODE:', node, '\n')
         if node is None:
-            counter += 1
-            print('\n')
-            continue
+            print('ERROR: NO NODE!\n')
+            return 1
+
         insights = get_insights(node, keyword)
         insights = get_more_related_terms(node, insights)
         related_urls = get_related_urls(node)
@@ -421,19 +422,36 @@ def main_function(data):
         print('KEYWORD:', keyword)
         print(insights)
         print(related_urls)
-        counter += 1
         print('\n')
         time.sleep(3)
+    else:
+        while counter < data_len:
+            keyword = data[counter]
+            node = get_node(keyword)
+            print('NODE:', node, '\n')
+            if node is None:
+                counter += 1
+                print('\n')
+                continue
+            insights = get_insights(node, keyword)
+            insights = get_more_related_terms(node, insights)
+            related_urls = get_related_urls(node)
 
-    # return insights, related_urls
+            print('KEYWORD:', keyword)
+            print(insights)
+            print(related_urls)
+            counter += 1
+            print('\n')
+            time.sleep(3)
+
+     return insights, related_urls
 
 
 ###########################################
 # Keyword   Node    Insights    URLs
 
 # running the program
-data = perfect_tags_list
-main_function(data)
+
 
 
 # loops to make pandas data frames

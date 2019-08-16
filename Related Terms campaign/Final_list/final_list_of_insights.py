@@ -186,7 +186,7 @@ def get_final_list(keyword):
 
 # a loop that goes thru all the databases and returns one big list
 def main():
-    data = perfect_tags_list
+    data = perfect_tags_list  ########## CHANGE THIS VARIABLE TO GET DIFFERENT RESULTS ######
 
     if type(data) is not str:  # if data is a list of terms
         for item in data:
